@@ -15,6 +15,7 @@ There are two different sets of parameters that you need to supply.
 There are two possibilities for changing parameters. System simulation is done in either case:
 * Click the *Set* button. Two things occur: The parameter is set; The min/max values of the associated slider are updated.
 * Change the value using the slider. The value of the parameter in the associated text box is updated.
+
 In case of the plant, the parameter you can change like this is the `K` parameter, which usually represents gain. In real-life systems this is the parameter that often changes "at run-time". The associated effect is called "gain variation", and if the controller is properly set up ("robust"), the effect this change has on the system is minimized.
 
 ### Logging
