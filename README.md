@@ -11,6 +11,7 @@ From the MATLAB command prompt run `bodepid`. You then see the main graphical us
 There are two different sets of parameters that you need to supply.
 * Plant parameters: enter your plant data in the form of a linear transfer function. Note that with this tool you need to enter zero and pole polynomials symbolically in terms of the `s` variable.
 * Controller parameters: Kp, Ki, and Kd gains of the PID controller in parallel form: C(s)=Kp+Ki/s+Kd s.
+
 There are two possibilities for changing parameters. System simulation is done in either case:
 * Click the *Set* button. Two things occur: The parameter is set; The min/max values of the associated slider are updated.
 * Change the value using the slider. The value of the parameter in the associated text box is updated.
