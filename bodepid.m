@@ -660,13 +660,10 @@ function fcdd_plot_responses(handles)
        y_old = history.y;
        t_old = history.t;
        w_old = history.w;
-       r_old = history.r;
-       
-       % Detailed frequency response
-       r_db_old = 20*log10(abs(r_old));
-       r_deg_old = rad2deg(angle(r_old));
-       
+       r_old = history.r; 
        p_old = history.p;
+       G_old = history.G;
+       C_old = history.C;
     end
     
     udGui = struct;
@@ -718,6 +715,20 @@ function fcdd_plot_responses(handles)
     % Time domain
     h1 = subplot(4,2,[2 4]);
     if doOldPlot
+        
+        % Simulate over for longer time
+        t_max = max(max(t), max(t_old)); % Longest time
+        numPts = max(length(t), length(t_old)); % Max length
+        t_st = t_max / numPts;
+        t_new = 0:t_st:t_max;
+        
+        % New responses
+        t = t_new;
+        y = step(feedback(C*G,1), t_new);
+        
+        t_old = t;
+        y_old = step(feedback(C_old*G_old,1), t_new);
+        
         plot(t_old,y_old,'Color',oldPlotColor,'LineWidth',2);
         hold on;
     end
@@ -731,6 +742,7 @@ function fcdd_plot_responses(handles)
     
     plot(t,y,'Color',newPlotColor, 'LineWidth',2);
     title(titleText);
+    xlim('auto');
     
     xlims = get(gca, 'xlim');
     
@@ -752,6 +764,26 @@ function fcdd_plot_responses(handles)
     
     grid;
     ylabel('Amplitude');
+    
+    % If history exists, recompute the frequency domain characteristics
+    if doOldPlot
+       w_min = min(min(w), min(w_old));
+       w_max = max(max(w), max(w_old));
+       numPts = max(length(w), length(w_old));
+       w_new = logspace(log10(w_min), log10(w_max), numPts);
+       
+       w = w_new;
+       r = freqresp(C*G, w);
+       r = r(:);
+
+       w_old = w_new;
+       r_old = freqresp(C_old*G_old, w);
+       r_old = r_old(:);
+       
+       r_db_old = 20*log10(abs(r_old));
+       r_deg_old = rad2deg(angle(r_old));
+        
+    end
     
     % Frequency domain
     r_db = 20*log10(abs(r));
