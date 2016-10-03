@@ -658,6 +658,7 @@ function fcdd_plot_responses(handles)
     % Get necessary values if history exists
     if doOldPlot
        y_old = history.y;
+       u_old = history.u;
        t_old = history.t;
        w_old = history.w;
        r_old = history.r; 
@@ -681,9 +682,19 @@ function fcdd_plot_responses(handles)
     CL = feedback(C*G,1);
     [y,t] = step(CL);
     
+    % Also get control law
+    CLU = C / (1+C*G);
+    u = step(CLU,t);
+    
     % Save for later
     history.y = y;
+    history.u = u;
     history.t = t;
+    
+    % Save for context menu
+    u_data = struct;
+    u_data.u = u;
+    u_data.t = t;
     
     % Open loop frequency response
     [r,w] = freqresp(C*G);
@@ -732,6 +743,11 @@ function fcdd_plot_responses(handles)
         plot(t_old,y_old,'Color',oldPlotColor,'LineWidth',2);
         hold on;
     end
+    
+    % Add context menu for control law
+    cmenu = uicontextmenu;
+    set(h1, 'UIContextMenu', cmenu);
+    m1 = uimenu(cmenu, 'Label', 'Show control law', 'Callback', @fcdd_draw_control_law, 'UserData', u_data);
     
     % Get some info on step
     S = stepinfo(y,t,y(end));
@@ -791,8 +807,6 @@ function fcdd_plot_responses(handles)
     
     % Get info on gm/pm
     [Gm,Pm,wcg,wcp] = margin(C*G);
-    
-    assignin('base', 'st', {wcg,wcp});
     
     % Some nice text
     titleText = ['Bode plot. Gm: ' num2str(Gm) ...
@@ -948,3 +962,19 @@ else
 end
 set(h, 'UserData', ud);
 
+% Draw the control law
+function fcdd_draw_control_law(source, callbackdata)
+    
+    % Get data
+    u_data = get(source, 'UserData');
+    u = u_data.u;
+    t = u_data.t;
+    
+    % Produce figure
+    h = figure;
+    plot(t, u, 'r', 'LineWidth', 2);
+    title('Current control law');
+    ylabel('Amplitude');
+    xlabel('Time');
+    set(h, 'Name', 'Control law', 'NumberTitle', 'off');
+    grid;    
