@@ -680,7 +680,14 @@ function fcdd_plot_responses(handles)
     
     % Closed loop system step response
     CL = feedback(C*G,1);
-    [y,t] = step(CL);
+    [y, t] = step(CL);
+    
+    % If t is nonuniform, resample; happens in case of delay systems
+    if G.ioDelay > 0
+        t_dif = mean(diff(t)); % Potentially sacrifice accuracy here
+        t = 0:t_dif:max(t);
+        y = step(CL, t);        
+    end
     
     % Also get control law
     CLU = C / (1+C*G);
