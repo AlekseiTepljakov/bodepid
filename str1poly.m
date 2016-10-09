@@ -45,8 +45,10 @@ function c = str1poly(polystr, params)
        
     end
     
-    % Resolve bracket multiplication
+    % Resolve bracket and operator multiplication
     polystr = strrep(polystr, ')(', ')*(');
+    polystr = strrep(polystr, 's(', 's*(');
+    polystr = strrep(polystr, ')s', ')*s');
     
     % Base variable
     s = tf('s');

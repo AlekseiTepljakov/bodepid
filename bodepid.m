@@ -22,7 +22,7 @@ function varargout = bodepid(varargin)
 
 % Edit the above text to modify the response to help bodepid
 
-% Last Modified by GUIDE v2.5 02-Oct-2016 11:25:21
+% Last Modified by GUIDE v2.5 09-Oct-2016 17:42:54
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -68,6 +68,7 @@ guidata(hObject, handles);
 ud = struct;
 ud.figureHandle = [];
 ud.log = 1;
+ud.upd_workspace = 0;
 set(hObject, 'UserData', ud);
 
 
@@ -645,6 +646,9 @@ function fcdd_plot_responses(handles)
     doLog = ud.log;
     doOldPlot = 0;
     
+    % Save vars to workspace?
+    doUpdWorkspace = ud.upd_workspace;
+    
     % Create a figure if it doesn't exist
     if isempty(fh) || ~ishandle(fh)
         h = figure;
@@ -672,37 +676,61 @@ function fcdd_plot_responses(handles)
     % Save for later
     udGui.figureHandle = h;
     udGui.log = doLog;
+    udGui.upd_workspace = doUpdWorkspace;
     
     % Get control system
     [G, C, K, Kp, Ki, Kd] = fcdd_get_system(handles);
+    
+    % Check the delay parameter
+    hasDelay = 0;
+    if ~isempty(G.ioDelay) && G.ioDelay > 0
+        hasDelay = 1;
+    end
+    
     history.G = G;
+    history.hasDelay = hasDelay;
     history.C = C;
     
     % Closed loop system step response
     CL = feedback(C*G,1);
-    [y, t] = step(CL);
     
-    % If t is nonuniform, resample; happens in case of delay systems
-    if G.ioDelay > 0
-        t_dif = mean(diff(t)); % Potentially sacrifice accuracy here
-        t = 0:t_dif:max(t);
-        y = step(CL, t);        
+    % Check whether system is proper. If not, hard fault.
+    if ~isproper(CL)
+        close(h);
+        errordlg(['Control system model is not proper.' ... 
+            'It has more zeros than poles and cannot be simulated.']);
+        return;
     end
     
-    % Also get control law
+    [y, t] = step(CL);
+
+    u = zeros(length(t));
+    
+    % Also get control law ONLY if C/(1+CG) system is proper
     CLU = C / (1+C*G);
-    u = step(CLU,t);
+    isControlProper = isproper(CLU);
+    
+    % t1 serves as the second non-uniform time vector in case of
+    % systems with time delays, but is the same as t otherwise.
+    t1 = t;
+    if isControlProper
+        if hasDelay
+            [u, t1] = step(CLU);
+        else
+            u = step(CLU,t1);
+        end
+    end
     
     % Save for later
     history.y = y;
-    history.u = u;
     history.t = t;
+    history.u = u;
     
     % Save for context menu
     u_data = struct;
+    u_data.t = t1;
     u_data.u = u;
-    u_data.t = t;
-    
+
     % Open loop frequency response
     [r,w] = freqresp(C*G);
     
@@ -713,7 +741,7 @@ function fcdd_plot_responses(handles)
     history.r = r;
     history.w = w;
     
-    % Closed loop pools (without regard to delay)
+    % Closed loop poles (without regard to delay)
     G_nd = G;
     G_nd.ioDelay = [];
     CL_nd = feedback(C*G_nd,1);
@@ -734,27 +762,33 @@ function fcdd_plot_responses(handles)
     h1 = subplot(4,2,[2 4]);
     if doOldPlot
         
-        % Simulate over for longer time
-        t_max = max(max(t), max(t_old)); % Longest time
-        numPts = max(length(t), length(t_old)); % Max length
-        t_st = t_max / numPts;
-        t_new = 0:t_st:t_max;
+        % Simulate over for longer time IF system doesn't have a delay
+        if ~hasDelay
+            t_max = max(max(t), max(t_old)); % Longest time
+            numPts = max(length(t), length(t_old)); % Max length
+            t_st = t_max / numPts;
+            t_new = 0:t_st:t_max;
         
-        % New responses
-        t = t_new;
-        y = step(feedback(C*G,1), t_new);
+            % New responses
+            t = t_new;
+            y = step(feedback(C*G,1), t_new);
         
-        t_old = t;
-        y_old = step(feedback(C_old*G_old,1), t_new);
+            t_old = t;
+            y_old = step(feedback(C_old*G_old,1), t_new);
+            
+        end
         
         plot(t_old,y_old,'Color',oldPlotColor,'LineWidth',2);
         hold on;
     end
     
-    % Add context menu for control law
-    cmenu = uicontextmenu;
-    set(h1, 'UIContextMenu', cmenu);
-    m1 = uimenu(cmenu, 'Label', 'Show control law', 'Callback', @fcdd_draw_control_law, 'UserData', u_data);
+    % Add context menu for control law, if corresponding system is proper
+    if isControlProper
+        cmenu = uicontextmenu;
+        set(h1, 'UIContextMenu', cmenu);
+        m1 = uimenu(cmenu, 'Label', 'Show control law', 'Callback', ...
+            @fcdd_draw_control_law, 'UserData', u_data);
+    end
     
     % Get some info on step
     S = stepinfo(y,t,y(end));
@@ -915,6 +949,16 @@ function fcdd_plot_responses(handles)
        
     end
     
+    % Update workspace
+    if doUpdWorkspace
+       assignin('base', 'Kp', Kp); 
+       assignin('base', 'Ki', Ki);
+       assignin('base', 'Kd', Kd);
+       assignin('base', 'K', K);
+       assignin('base', 'C', C);
+       assignin('base', 'G', G);
+    end
+    
     % Save new user data
     set(hObject, 'UserData', udGui);
     ud.history = history;
@@ -984,4 +1028,42 @@ function fcdd_draw_control_law(source, callbackdata)
     ylabel('Amplitude');
     xlabel('Time');
     set(h, 'Name', 'Control law', 'NumberTitle', 'off');
-    grid;    
+    grid;
+    
+% Resample t vector if it is nonuniform using minimum step by default
+% Method for choosing step can also be "mean", "max", etc.
+function t_new = fcdd_resample_t(t, method)
+    % Check that a default method is set
+    if nargin < 2
+        method = 'min'; % Exact method but very slow
+    end
+    
+    fun_method = str2func(method);
+    
+    t_dif = fun_method(diff(t));
+    t_new = 0:t_dif:max(t);
+
+
+% --------------------------------------------------------------------
+function menuEdit_Callback(hObject, eventdata, handles)
+% hObject    handle to menuEdit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function menuUpdWorkspace_Callback(hObject, eventdata, handles)
+% hObject    handle to menuUpdWorkspace (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+h = handles.output;
+ud = get(h, 'UserData');
+if strcmpi(get(handles.menuUpdWorkspace, 'Checked'), 'on')
+   set(handles.menuUpdWorkspace, 'Checked', 'off');
+   ud.upd_workspace = 0;
+else
+   set(handles.menuUpdWorkspace, 'Checked', 'on');
+   ud.upd_workspace = 1;
+end
+set(h, 'UserData', ud);

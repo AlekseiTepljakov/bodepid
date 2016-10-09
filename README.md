@@ -23,6 +23,9 @@ There are two sources of information about the past response of the system.
 * The previous response is drawn on the simulation plot. You can then find out how the change you made affects the quality of control.
 * You can enable logging (on by default) from the user interface menu. Then, every change of parameters will be reflected in the MATLAB console.
 
+### Updating the Workspace
+Through the GUI menu, you can enable automatic MATLAB workspace updates. When this option is turned on, all the internal variables of BODEPID will be transfered to MATLAB workspace whenever the control system parameters are updated from the tool. This allows to use these parameters externally, e.g.: in Simulink to model and study nonlinear effects.
+
 ## Credits
 Designed by Aleksei Tepljakov as a supplementary tool for a Control Engineering course in Tallinn University of Technology.
 
